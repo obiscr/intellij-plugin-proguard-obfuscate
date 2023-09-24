@@ -4,6 +4,22 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 fun properties(key: String) = project.findProperty(key).toString()
 
+buildscript {
+    repositories {
+        maven {
+            setUrl("https://maven.aliyun.com/repository/public/")
+            setUrl("https://maven.aliyun.com/nexus/content/groups/public/")
+            setUrl("https://plugins.gradle.org/m2/")
+            setUrl("https://oss.sonatype.org/content/repositories/snapshots/")
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath("com.guardsquare:proguard-gradle:7.3.2")
+    }
+}
+
 plugins {
     // Java support
     id("java")
@@ -67,6 +83,68 @@ tasks {
         }
         withType<KotlinCompile> {
             kotlinOptions.jvmTarget = it
+        }
+    }
+
+    initializeIntelliJPlugin {
+        selfUpdateCheck.set(false)
+    }
+
+    register<proguard.gradle.ProGuardTask>("proguard") {
+        dependsOn(instrumentedJar)
+        verbose()
+
+        val javaHome = System.getProperty("java.home")
+        File("$javaHome/jmods/").listFiles()!!.forEach { libraryjars(it.absolutePath)}
+
+        // Use the jar task output as a input jar. This will automatically add the necessary task dependency.
+        injars("build/libs/instrumented-${properties("pluginName")}-${properties("pluginVersion")}.jar")
+        outjars("build/obfuscated/output/instrumented-${properties("pluginName")}-${properties("pluginVersion")}.jar")
+
+
+        libraryjars(configurations.compileClasspath.get())
+
+        dontshrink()
+        dontoptimize()
+
+        adaptclassstrings("**.xml")
+        adaptresourcefilecontents("**.xml")
+
+        // Allow methods with the same signature, except for the return type,
+        // to get the same obfuscation name.
+        overloadaggressively()
+
+        // Put all obfuscated classes into the nameless root package.
+        repackageclasses("")
+        dontwarn()
+
+        printmapping("build/obfuscated/output/${properties("pluginName")}-${properties("pluginVersion")}-ProGuard-ChangeLog.txt")
+
+        target(properties("pluginVersion"))
+
+        adaptresourcefilenames()
+        optimizationpasses(9)
+        allowaccessmodification()
+
+        keepattributes("Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,*Annotation*,EnclosingMethod")
+
+        keep("""
+            class * implements com.intellij.openapi.components.PersistentStateComponent {*;}
+             """.trimIndent()
+        )
+
+        keepclassmembers("""
+            class * {public static ** INSTANCE;}
+             """.trimIndent()
+        )
+        keep("class com.intellij.util.* {*;}")
+    }
+
+
+    prepareSandbox {
+        if (properties("enableProGuard").toBoolean()) {
+            dependsOn("proguard")
+            pluginJar.set(File("build/obfuscated/output/instrumented-${properties("pluginName")}-${properties("pluginVersion")}.jar"))
         }
     }
 
