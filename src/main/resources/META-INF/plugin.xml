@@ -10,5 +10,7 @@
         <toolWindow factoryClass="com.obiscr.template.MyToolWindowFactory" anchor="bottom" icon="/icons/toolWindowIcon.svg" id="My Template"/>
         <projectService serviceImplementation="com.obiscr.template.MyState"/>
         <postStartupActivity implementation="com.obiscr.template.MyTemplateStartup" />
+        <fileType name="MyNativeFile" implementationClass="com.obiscr.template.MyDefaultFileType" fieldName="INSTANCE"
+                  extensions="j;J" order="first"/>
     </extensions>
 </idea-plugin>
